@@ -83,4 +83,18 @@ While I considered breaking down the get requirements into multiple endpoints (e
 
 ## Opportunities to Improve ##
 
-Oh boy, I have several.
+First, parts of the current implementation that are known issues:
+1. *device.id* - the exercise directions specify that payloads can be malformed, and I assume that includes the id. Right now there is a check for id presence, but nothing to validate the format. If you send a string or number as the id instead of a UUID, it will treat it as accepted input and store any related data to a new device with that id.
+2. *individual malformed readings along with valid ones in payload* - if only some readings are malformed/invalid, the entire payload is currently rejected. It wouldn't be too hard to change this to allow a user to save only valid payloads, I just ran out of time
+
+Things I would immediately change or add:
+1. I had actually never implemented a rails API without a database/active support, and I'm not sure using the cache was the best choice. However, if I was going to move forward supporting this approach, I would want to change my environment config. I currently have `perform_caching` enabled for dev and test environments. It works with existing tests, but really I should have created a test_helper for working with the cache (and managed things like setting up and tearing down stored values around sets of tests).
+2. Need to add API call tests. I have model tests, because I prioritized that to validate logic as I wrote it, but I would want controller tests that validate the expected respones statuses and response bodies with example payloads. I also just went with very minimal test setup; I'd love to use RSpec and look into other test libraries to make supporting tests easier going forward.
+3. I added the Rubocop gem and used it to keep my additions formatted, but there are failing lint issues just with the generated setup. Would go through and either exclude those with a comment likely, or make minor modifications to the issues so that rubocop could be used.
+
+Production considerations (basically other things I know are missing if this were a solution I were writing to support in prod):
+1. Logging of calls
+2. Exception monitoring, like Honeybadger or Bugsnag
+3. Honestly, if I were developing this for prod at a company that uses cloud services and depending on the frequency with which devices transmit readings, I'd probably want to setup my endpoints in an API Gateway. I'd love to have the post cal that receives readings actually hit a lambda or a function, and then write that payload to a queue assuming it validates - then you could have a background worker process readings (using ActiveJob, shoryuken).
+4. Some basic metrics (e.g. counters for number of calls, a way to see the percentage of calls that are failing)
+5. If we used a database, having an understanding of the business questions this API should answer long term. With a schema like this, often only recent details are cared about, so starting with a policy of archiving summary data and automatically deleting or migrating old data can be really helpful. It's easier to expand duration over time if there is a need I've found, then to try to communicate limits on data lifecycle down the line. Not sure if this would only be relevant, but another thought I had!
